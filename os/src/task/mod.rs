@@ -14,6 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
@@ -157,6 +158,19 @@ fn mark_current_suspended() {
 fn mark_current_exited() {
     TASK_MANAGER.mark_current_exited();
 }
+
+
+/// get current task
+
+pub fn get_current_task_status()->Option<TaskStatus>{
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    if let Some(task) = inner.tasks.get(inner.current_task){
+        Some(task.task_status)
+    }else{
+        None
+    }
+}
+
 
 /// Suspend the current 'Running' task and run the next task in task list.
 pub fn suspend_current_and_run_next() {
