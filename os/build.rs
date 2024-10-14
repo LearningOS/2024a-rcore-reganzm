@@ -4,9 +4,11 @@ use std::fs::{read_dir, File};
 use std::io::{Result, Write};
 
 fn main() {
+    println!("start build ......");
     println!("cargo:rerun-if-changed=../user/src/");
     println!("cargo:rerun-if-changed={}", TARGET_PATH);
     insert_app_data().unwrap();
+    println!("end build ......");
 }
 
 static TARGET_PATH: &str = "../user/build/bin/";

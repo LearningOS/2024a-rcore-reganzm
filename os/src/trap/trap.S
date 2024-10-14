@@ -11,6 +11,7 @@
     .align 2
 __alltraps:
     csrrw sp, sscratch, sp
+    # todo before sscratch -> kernel stack , why?
     # now sp->kernel stack, sscratch->user stack
     # allocate a TrapContext on kernel stack
     addi sp, sp, -34*8
@@ -40,6 +41,7 @@ __alltraps:
 __restore:
     # case1: start running app by __restore
     # case2: back to U after handling trap
+    # todo why ???? 
     mv sp, a0
     # now sp->kernel stack(after allocated), sscratch->user stack
     # restore sstatus/sepc
@@ -59,6 +61,6 @@ __restore:
     .endr
     # release TrapContext on kernel stack
     addi sp, sp, 34*8
-    # now sp->kernel stack, sscratch->user stack
+    # now sp->user stack,sscratch -> kernel stack
     csrrw sp, sscratch, sp
     sret

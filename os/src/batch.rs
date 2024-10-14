@@ -87,6 +87,7 @@ impl AppManager {
         // Therefore, fence.i must be executed after we have loaded
         // the code of the next app into the instruction memory.
         // See also: riscv non-priv spec chapter 3, 'Zifencei' extension.
+        // todo ! important
         asm!("fence.i");
     }
 
@@ -132,7 +133,7 @@ pub fn print_app_info() {
 
 /// run next app
 pub fn run_next_app() -> ! {
-    let mut app_manager = APP_MANAGER.exclusive_access();
+    let mut app_manager: core::cell::RefMut<'_, AppManager> = APP_MANAGER.exclusive_access();
     let current_app = app_manager.get_current_app();
     unsafe {
         app_manager.load_app(current_app);
