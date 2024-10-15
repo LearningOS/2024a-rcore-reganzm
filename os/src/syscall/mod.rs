@@ -24,16 +24,37 @@ const SYSCALL_TASK_INFO: usize = 410;
 mod fs;
 mod process;
 
+use crate::task::{get_current_task_id, set_current_task_info};
 use fs::*;
-use process::*;
+pub use process::*;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    let task_id = get_current_task_id();
+    set_current_task_info(task_id, syscall_id);
     match syscall_id {
-        SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
+        SYSCALL_WRITE => {
+            if task_id > 0 {
+                println!(
+                    "====>task_id:{} fd:{} {} {} ",
+                    task_id, args[0], args[1], args[2]
+                );
+            }
+            sys_write(args[0], args[1] as *const u8, args[2])
+        }
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_GET_TIME => sys_get_time(args[0] as *mut TimeVal, args[1]),
-        SYSCALL_TASK_INFO => sys_task_info(args[0] as *mut TaskInfo),
+        SYSCALL_TASK_INFO => {
+            let t = args[0] as *mut TaskInfo;
+            unsafe {
+                println!("----> {:?}",(*t).status);
+            }
+            let result = sys_task_info(t);
+            unsafe {
+                println!("----> {:?}",(*t).status);
+            }
+            result
+        },
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

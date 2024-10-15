@@ -14,16 +14,16 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::syscall::TaskInfo;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
-
 /// The task manager, where all the tasks are managed.
 ///
 /// Functions implemented on `TaskManager` deals with all task state transitions
@@ -55,6 +55,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_info:TaskInfo::init()
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -79,7 +80,7 @@ impl TaskManager {
     /// But in ch3, we load apps statically, so the first task is a real app.
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
-        let task0 = &mut inner.tasks[0];
+        let task0: &mut TaskControlBlock = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
@@ -159,18 +160,48 @@ fn mark_current_exited() {
     TASK_MANAGER.mark_current_exited();
 }
 
+/// get current task status
 
-/// get current task
-
-pub fn get_current_task_status()->Option<TaskStatus>{
-    let inner = TASK_MANAGER.inner.exclusive_access();
-    if let Some(task) = inner.tasks.get(inner.current_task){
-        Some(task.task_status)
-    }else{
-        None
-    }
+pub fn get_current_task_status() -> Option<TaskStatus> {
+    get_current_task_tcb().and_then(|t| Some(t.task_status))
 }
 
+/// get current task ctx
+pub fn get_current_task_ctx() -> Option<TaskContext> {
+    get_current_task_tcb().and_then(|t| Some(t.task_cx))
+}
+
+/// get current task info
+pub fn get_current_task_info() -> Option<TaskInfo> {
+    get_current_task_tcb().and_then(|t| Some(t.task_info))
+}
+
+/// get current task TCB
+pub fn get_current_task_tcb() -> Option<TaskControlBlock> {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let ret_val = inner.tasks.get(inner.current_task).cloned();
+    drop(inner);
+    ret_val
+}
+
+/// get current task id
+pub fn get_current_task_id() -> usize {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    inner.current_task
+}
+
+/// set syscall id and time when syscall occur
+pub fn set_current_task_info(task_id: usize, syscall_id: usize) {
+    let tcb = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
+    let task_info = &mut tcb.task_info;
+    task_info.syscall_times[syscall_id] += 1;
+    if task_info.first_time == 0 {
+        task_info.first_time = get_time_ms();
+    }
+    task_info.last_time = get_time_ms();
+    task_info.time = task_info.last_time - task_info.first_time;
+    task_info.status = tcb.task_status.clone();
+}
 
 /// Suspend the current 'Running' task and run the next task in task list.
 pub fn suspend_current_and_run_next() {

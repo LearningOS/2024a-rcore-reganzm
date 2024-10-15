@@ -1,26 +1,50 @@
 //! Process management syscalls
 use crate::{
     config::MAX_SYSCALL_NUM,
-    task::{exit_current_and_run_next, get_current_task_status, suspend_current_and_run_next, TaskStatus},
+    task::{
+        exit_current_and_run_next, get_current_task_info, get_current_task_status,
+        suspend_current_and_run_next, TaskStatus,
+    },
     timer::get_time_us,
 };
 
+/// time value
 #[repr(C)]
 #[derive(Debug)]
 pub struct TimeVal {
+    /// seconds
     pub sec: usize,
+    /// milliseconds
     pub usec: usize,
 }
 
 /// Task information
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
+    /// first syscall time
+    pub first_time: usize,
+    /// last syscall time
+    pub last_time: usize,
+}
+
+impl TaskInfo {
+    /// init Taskinfo
+    pub fn init() -> Self {
+        Self {
+            status: TaskStatus::UnInit,
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            time: 0,
+            first_time: 0,
+            last_time: 0,
+        }
+    }
 }
 
 /// task exits and submit an exit code
@@ -54,11 +78,24 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
     unsafe {
+        // current task status
         let t_task_status = get_current_task_status();
-        if t_task_status.is_none(){
-            return -1
-        }else{
+        if t_task_status.is_none() {
+            return -1;
+        } else {
             (*ti).status = t_task_status.unwrap();
+        }
+        // task syscalls times
+        let t_task_info = get_current_task_info();
+        if t_task_info.is_none() {
+            return -1;
+        } else {
+            let info = t_task_info.unwrap();
+            (*ti).syscall_times = info.syscall_times;
+            (*ti).time = info.time;
+            (*ti).status = t_task_status.unwrap();
+            (*ti).last_time = info.last_time;
+            (*ti).first_time = info.first_time;
         }
     }
     0
