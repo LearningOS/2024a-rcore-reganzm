@@ -27,11 +27,7 @@ pub struct TaskInfo {
     /// The numbers of syscall called by task
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    pub time: usize,
-    /// first syscall time
-    pub first_time: usize,
-    /// last syscall time
-    pub last_time: usize,
+    pub time: usize
 }
 
 impl TaskInfo {
@@ -40,9 +36,7 @@ impl TaskInfo {
         Self {
             status: TaskStatus::UnInit,
             syscall_times: [0; MAX_SYSCALL_NUM],
-            time: 0,
-            first_time: 0,
-            last_time: 0,
+            time: 0
         }
     }
 }
@@ -94,8 +88,6 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
             (*ti).syscall_times = info.syscall_times;
             (*ti).time = info.time;
             (*ti).status = t_task_status.unwrap();
-            (*ti).last_time = info.last_time;
-            (*ti).first_time = info.first_time;
         }
     }
     0

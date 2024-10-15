@@ -55,7 +55,9 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
-            task_info:TaskInfo::init()
+            task_info:TaskInfo::init(),
+            start_time:0,
+            end_time:0
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -192,14 +194,14 @@ pub fn get_current_task_id() -> usize {
 
 /// set syscall id and time when syscall occur
 pub fn set_current_task_info(task_id: usize, syscall_id: usize) {
-    let tcb = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
+    let tcb: &mut TaskControlBlock = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
     let task_info = &mut tcb.task_info;
     task_info.syscall_times[syscall_id] += 1;
-    if task_info.first_time == 0 {
-        task_info.first_time = get_time_ms();
+    if tcb.start_time == 0 {
+        tcb.start_time = get_time_ms();
     }
-    task_info.last_time = get_time_ms();
-    task_info.time = task_info.last_time - task_info.first_time;
+    tcb.end_time = get_time_ms();
+    task_info.time = tcb.end_time - tcb.start_time;
     task_info.status = tcb.task_status.clone();
 }
 
