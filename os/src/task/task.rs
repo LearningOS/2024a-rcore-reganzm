@@ -1,9 +1,12 @@
 //! Types related to task management
+use alloc::vec::Vec;
+
 use super::TaskContext;
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{
-    kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
+    kernel_stack_position, FrameTracker, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE
 };
+use crate::syscall::process::TaskInfo;
 use crate::trap::{trap_handler, TrapContext};
 
 /// The task control block (TCB) of a task.
@@ -13,6 +16,9 @@ pub struct TaskControlBlock {
 
     /// Maintain the execution status of the current process
     pub task_status: TaskStatus,
+
+    /// task info
+    pub task_info: TaskInfo,
 
     /// Application address space
     pub memory_set: MemorySet,
@@ -28,6 +34,13 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// pub start time
+    pub start_time: usize,
+
+    /// pub  end time
+    pub end_time: usize,
+
 }
 
 impl TaskControlBlock {
@@ -63,6 +76,13 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            task_info: TaskInfo {
+                status: task_status,
+                time: 0,
+                syscall_times: [0; MAX_SYSCALL_NUM],
+            },
+            start_time: 0,
+            end_time: 0
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
@@ -98,7 +118,7 @@ impl TaskControlBlock {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 /// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
     /// uninitialized

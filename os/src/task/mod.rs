@@ -13,12 +13,15 @@ mod context;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
-
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{FrameTracker, MapPermission, VirtAddr, VirtPageNum};
 use crate::sync::UPSafeCell;
+use crate::syscall::process::TaskInfo;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
+use riscv::addr::Frame;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
@@ -201,4 +204,72 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// get current task status
+
+pub fn get_current_task_status() -> Option<TaskStatus> {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let ret_val = inner.tasks.get(inner.current_task);
+    ret_val.and_then(|t| Some(t.task_status.clone()))
+}
+
+/// pub current frame tracker
+// pub fn get_current_frame_tracker() ->Option<Vec<FrameTracker>>{
+//     let inner = TASK_MANAGER.inner.exclusive_access();
+//     let ret_val = inner.tasks.get(inner.current_task);
+// }
+
+/// get current task ctx
+pub fn get_current_task_ctx() -> Option<TaskContext> {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let ret_val = inner.tasks.get(inner.current_task);
+    ret_val.and_then(|t| Some(t.task_cx.clone()))
+}
+
+/// get current task info
+pub fn get_current_task_info() -> Option<TaskInfo> {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let ret_val = inner.tasks.get(inner.current_task);
+    let result = ret_val.and_then(|t| Some(t.task_info.clone()));
+    drop(inner);
+    result
+}
+
+/// get current task TCB
+// pub fn get_current_task_tcb() -> Option<TaskControlBlock> {
+//     let inner = TASK_MANAGER.inner.exclusive_access();
+//     let ret_val = inner.tasks.get(inner.current_task).cloned();
+//     drop(inner);
+//     ret_val
+// }
+
+/// get current task id
+pub fn get_current_task_id() -> usize {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    inner.current_task
+}
+
+
+
+/// set syscall id and time when syscall occur
+pub fn set_current_task_info(task_id: usize, syscall_id: usize) {
+    let tcb: &mut TaskControlBlock = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
+    let task_info = &mut tcb.task_info;
+    task_info.syscall_times[syscall_id] += 1;
+    if tcb.start_time == 0 {
+        tcb.start_time = get_time_ms();
+    }
+    tcb.end_time = get_time_ms();
+    task_info.time = tcb.end_time - tcb.start_time;
+    task_info.status = tcb.task_status.clone();
+}
+
+pub fn insert_framed_area(start_va:VirtAddr,end_va:VirtAddr,prot:usize){
+    let task_id = get_current_task_id();
+    let tcb: &mut TaskControlBlock = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
+    let memory_set = &mut tcb.memory_set;
+    let prot:u8 = prot as u8 | ( MapPermission::U | MapPermission::V ).bits();
+    let permission = MapPermission::from_bits(prot).unwrap();
+    memory_set.insert_framed_area(start_va, end_va, permission);
 }
