@@ -4,7 +4,8 @@ use alloc::vec::Vec;
 use super::TaskContext;
 use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{
-    kernel_stack_position, FrameTracker, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE
+    kernel_stack_position, FrameTracker, MapPermission, MemorySet, PhysPageNum, VirtAddr,
+    KERNEL_SPACE,
 };
 use crate::syscall::process::TaskInfo;
 use crate::trap::{trap_handler, TrapContext};
@@ -40,7 +41,6 @@ pub struct TaskControlBlock {
 
     /// pub  end time
     pub end_time: usize,
-
 }
 
 impl TaskControlBlock {
@@ -82,7 +82,7 @@ impl TaskControlBlock {
                 syscall_times: [0; MAX_SYSCALL_NUM],
             },
             start_time: 0,
-            end_time: 0
+            end_time: 0,
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();

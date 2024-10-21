@@ -250,8 +250,6 @@ pub fn get_current_task_id() -> usize {
     inner.current_task
 }
 
-
-
 /// set syscall id and time when syscall occur
 pub fn set_current_task_info(task_id: usize, syscall_id: usize) {
     let tcb: &mut TaskControlBlock = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
@@ -265,11 +263,29 @@ pub fn set_current_task_info(task_id: usize, syscall_id: usize) {
     task_info.status = tcb.task_status.clone();
 }
 
-pub fn insert_framed_area(start_va:VirtAddr,end_va:VirtAddr,prot:usize){
+pub fn insert_framed_area(start_va: VirtAddr, end_va: VirtAddr, prot: usize) -> isize {
     let task_id = get_current_task_id();
     let tcb: &mut TaskControlBlock = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
     let memory_set = &mut tcb.memory_set;
-    let prot:u8 = prot as u8 | ( MapPermission::U | MapPermission::V ).bits();
+    let prot: u8 = prot as u8 | (MapPermission::U | MapPermission::V).bits();
     let permission = MapPermission::from_bits(prot).unwrap();
-    memory_set.insert_framed_area(start_va, end_va, permission);
+    memory_set.insert_framed_area(start_va, end_va, permission)
+}
+
+pub fn un_map(vpn: VirtPageNum) -> isize {
+    let task_id = get_current_task_id();
+    let tcb: &mut TaskControlBlock = &mut TASK_MANAGER.inner.exclusive_access().tasks[task_id];
+    let memory_set = &mut tcb.memory_set;
+    let page_table = &mut memory_set.page_table;
+    if let Some(area) = memory_set
+        .areas
+        .iter_mut()
+        .find(|area| area.vpn_range.get_start() == vpn)
+    {
+        area.unmap_one(page_table, vpn);
+        return 0;
+    } else {
+        println!("not found maparea {:?}", vpn);
+        return -1;
+    }
 }

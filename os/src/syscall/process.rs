@@ -2,9 +2,9 @@
 
 use crate::{
     config::{MAX_SYSCALL_NUM, PAGE_SIZE, PAGE_SIZE_BITS},
-    mm::{frame_alloc, PTEFlags, PageTable, PhysPageNum, VirtAddr},
+    mm::{frame_alloc, PTEFlags, PageTable, PhysPageNum, VirtAddr, VirtPageNum},
     task::{
-        change_program_brk, current_user_token, exit_current_and_run_next, get_current_task_info, get_current_task_status, insert_framed_area, suspend_current_and_run_next, TaskStatus, TASK_MANAGER
+        change_program_brk, current_user_token, exit_current_and_run_next, get_current_task_info, get_current_task_status, insert_framed_area, suspend_current_and_run_next, un_map, TaskStatus, TASK_MANAGER
     },
     timer::get_time_us,
 };
@@ -98,15 +98,23 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 }
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, mut port: usize) -> isize {
+    println!("start :{} len:{} port:{} ", start, len, port);
     if len == 0 {
         return -1;
     }
+    // invald port
     if port & 0x7 == 0 {
         return -1;
     }
+    // other bit must be 0
     if port & !0x7 != 0 {
         return -1;
     }
+    // align with 4k
+    if start & 0xfff != 0 {
+        return -1;
+    }
+    // left shift 1bit the zero bit is valiable bit
     port = port << 1;
     // v r w x
     port &= 0xf;
@@ -114,16 +122,25 @@ pub fn sys_mmap(start: usize, len: usize, mut port: usize) -> isize {
     port |= 0x10;
     // avalable
     port |= 0x1;
+
     println!("port value ======> {:b}", port);
-    insert_framed_area(VirtAddr::from(start), VirtAddr::from(start+len), port);
-    println!("00000000000 return 0");
-    return 0;
+    let result = insert_framed_area(VirtAddr::from(start), VirtAddr::from(start + len), port);
+    println!("00000000000 return {}", result);
+    return result;
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    if start & 0xfff != 0{
+        return -1;
+    }
+    let start_vpn = VirtAddr::from(start).floor().0;
+    let end_vpn = VirtAddr::from(start + len).ceil().0;
+    let mut result = 0;
+    for vpn in start_vpn..end_vpn{
+        result = un_map(vpn.into());
+    }
+    result
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
