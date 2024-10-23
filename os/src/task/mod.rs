@@ -22,12 +22,12 @@ mod switch;
 #[allow(rustdoc::private_intra_doc_links)]
 mod task;
 
+use crate::fs::{open_file, OpenFlags};
 use crate::{
-    loader::get_app_data_by_name,
+    //loader::get_app_data_by_name,
     mm::{MapPermission, VirtAddr, VirtPageNum},
     timer::get_time_ms,
 };
-use crate::fs::{open_file, OpenFlags};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;

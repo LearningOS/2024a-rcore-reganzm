@@ -4,10 +4,14 @@ use alloc::sync::Arc;
 
 use crate::{
     config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS},
-    loader::get_app_data_by_name,
+    fs::{open_file, OpenFlags},
+    // todo
+    //loader::get_app_data_by_name,
     mm::{translated_refmut, translated_str, PageTable, VirtAddr},
     task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next, get_current_task_info, get_current_task_status, insert_framed_area, suspend_current_and_run_next, un_map, TaskControlBlock, TaskStatus
+        add_task, current_task, current_user_token, exit_current_and_run_next,
+        get_current_task_info, get_current_task_status, insert_framed_area,
+        suspend_current_and_run_next, un_map, TaskStatus,
     },
     timer::get_time_us,
 };
@@ -229,27 +233,31 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(path: *const u8) -> isize {
-    let mut new_task_id:isize  = -1;
-    let token = current_user_token();
-    let path = translated_str(token, path);
-    let elf_data = get_app_data_by_name(path.as_str());
-    if let Some(data) =  elf_data{
-        let new_task = Arc::new(TaskControlBlock::new(data));
-        new_task_id = new_task.getpid() as isize;
-        let task = current_task().unwrap();
-        task.inner_exclusive_access().children.push(new_task.clone());
-        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&new_task));
-        add_task(new_task);
-    };
-    new_task_id
+pub fn sys_spawn(_path: *const u8) -> isize {
+    // let mut new_task_id: isize = -1;
+    // let token = current_user_token();
+    // let path = translated_str(token, path);
+    // todo
+    // todo let elf_data = get_app_data_by_name(path.as_str());
+    // if let Some(data) = elf_data {
+    //     let new_task = Arc::new(TaskControlBlock::new(data));
+    //     new_task_id = new_task.getpid() as isize;
+    //     let task = current_task().unwrap();
+    //     task.inner_exclusive_access()
+    //         .children
+    //         .push(new_task.clone());
+    //     new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&new_task));
+    //     add_task(new_task);
+    // };
+    //new_task_id
+    -1
 }
 
 // YOUR JOB: Set task priority.
 pub fn sys_set_priority(prio: isize) -> isize {
     let mut result = -1isize;
     if prio >= 2 {
-       let current_task = current_task();
+        let current_task = current_task();
         if let Some(tcb) = current_task {
             let mut inner = tcb.inner_exclusive_access();
             inner.priority = prio;
