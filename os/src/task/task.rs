@@ -14,8 +14,20 @@ use alloc::{
     vec,
     vec::Vec,
 };
+use crate::config::MAX_SYSCALL_NUM;
 use core::cell::RefMut;
 
+/// Task information
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct TaskInfo {
+    /// Task status in it's life cycle
+    pub status: TaskStatus,
+    /// The numbers of syscall called by task
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// Total running time of task
+    pub time: usize,
+}
 /// Task control block structure
 ///
 /// Directly save the contents that will not change during running
@@ -87,6 +99,15 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task info
+    pub task_info: TaskInfo,
+
+    /// pub start time
+    pub start_time: usize,
+
+    /// pub  end time
+    pub end_time: usize,
 }
 
 impl TaskControlBlockInner {
@@ -158,6 +179,13 @@ impl TaskControlBlock {
                     trap_ctx_backup: None,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    start_time: 0,
+                    end_time: 0,
+                    task_info: TaskInfo {
+                        status: TaskStatus::UnInit,
+                        syscall_times: [0; MAX_SYSCALL_NUM],
+                        time: 0,
+                    },
                 })
             },
         };
@@ -273,6 +301,13 @@ impl TaskControlBlock {
                     trap_ctx_backup: None,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    start_time: 0,
+                    end_time: 0,
+                    task_info: TaskInfo {
+                        status: TaskStatus::UnInit,
+                        syscall_times: [0; MAX_SYSCALL_NUM],
+                        time: 0,
+                    },
                 })
             },
         });
@@ -320,7 +355,7 @@ impl TaskControlBlock {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 /// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
     /// uninitialized

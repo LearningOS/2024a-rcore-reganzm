@@ -69,10 +69,14 @@ mod process;
 use fs::*;
 use process::*;
 
+use crate::task::set_current_task_info;
+
 use crate::{fs::Stat, task::SignalAction};
+
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+    set_current_task_info(syscall_id);
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_OPEN => sys_open(args[1] as *const u8, args[2] as u32),

@@ -15,7 +15,7 @@ use lazy_static::*;
 /// Processor management structure
 pub struct Processor {
     ///The task currently executing on the current processor
-    current: Option<Arc<TaskControlBlock>>,
+    pub current: Option<Arc<TaskControlBlock>>,
 
     ///The basic control flow of each core, helping to select and switch process
     idle_task_cx: TaskContext,
