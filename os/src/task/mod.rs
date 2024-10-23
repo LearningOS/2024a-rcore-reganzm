@@ -22,12 +22,18 @@ mod switch;
 #[allow(rustdoc::private_intra_doc_links)]
 mod task;
 
+use crate::{
+    loader::get_app_data_by_name,
+    mm::{MapPermission, VirtAddr, VirtPageNum},
+    timer::get_time_ms,
+};
 use crate::fs::{open_file, OpenFlags};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
 pub use manager::{fetch_task, TaskManager};
 use switch::__switch;
+use task::TaskInfo;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
@@ -53,6 +59,15 @@ pub fn suspend_current_and_run_next() {
     add_task(task);
     // jump to scheduling cycle
     schedule(task_cx_ptr);
+}
+
+/// get current task info
+pub fn get_current_task_info() -> Option<TaskInfo> {
+    if let Some(current_task) = current_task() {
+        Some(current_task.inner_exclusive_access().task_info.clone())
+    } else {
+        None
+    }
 }
 
 /// pid of usertests app in make run TEST=1
@@ -119,4 +134,92 @@ lazy_static! {
 ///Add init process to the manager
 pub fn add_initproc() {
     add_task(INITPROC.clone());
+}
+
+/// get current task status
+pub fn get_current_task_status() -> Option<TaskStatus> {
+    let current_task = current_task();
+    if let Some(task) = current_task {
+        let inner = task.inner_exclusive_access();
+        Some(inner.task_status.clone())
+    } else {
+        None
+    }
+}
+
+/// get current task ctx
+pub fn get_current_task_ctx() -> Option<TaskContext> {
+    let current = current_task();
+    if let Some(task) = current {
+        Some(task.inner_exclusive_access().task_cx.clone())
+    } else {
+        None
+    }
+}
+
+/// get current task TCB
+// pub fn get_current_task_tcb() -> Option<TaskControlBlock> {
+//     let inner = TASK_MANAGER.inner.exclusive_access();
+//     let ret_val = inner.tasks.get(inner.current_task).cloned();
+//     drop(inner);
+//     ret_val
+// }
+
+/// get current task id
+pub fn get_current_task_id() -> usize {
+    let pid = current_task().unwrap().pid.0;
+    pid
+}
+
+/// set syscall id and time when syscall occur
+pub fn set_current_task_info(syscall_id: usize) {
+    let current_task = current_task();
+    if let Some(tcb) = current_task {
+        let mut task_inner = tcb.inner_exclusive_access();
+        if task_inner.start_time == 0 {
+            task_inner.start_time = get_time_ms();
+        }
+        task_inner.end_time = get_time_ms();
+        let start_time = task_inner.start_time;
+        let end_time = task_inner.end_time;
+        let time = end_time - start_time;
+        let task_status = task_inner.task_status.clone();
+        let task_info = &mut task_inner.task_info;
+        task_info.syscall_times[syscall_id] += 1;
+        task_info.time = time;
+        task_info.status = task_status;
+    }
+}
+
+/// insert freamd page area from virtaddr range
+pub fn insert_framed_area(start_va: VirtAddr, end_va: VirtAddr, prot: usize) -> isize {
+    if let Some(tcb) = current_task() {
+        let memory_set = &mut tcb.inner_exclusive_access().memory_set;
+        let prot: u8 = prot as u8 | (MapPermission::U | MapPermission::V).bits();
+        let permission = MapPermission::from_bits(prot).unwrap();
+        memory_set.insert_framed_area(start_va, end_va, permission)
+    } else {
+        -1
+    }
+}
+
+/// unmap a page
+pub fn un_map(vpn: VirtPageNum) -> isize {
+    if let Some(current_task) = current_task() {
+        let memory_set = &mut current_task.inner_exclusive_access().memory_set;
+        let page_table = &mut memory_set.page_table;
+        if let Some(area) = memory_set
+            .areas
+            .iter_mut()
+            .find(|area| area.vpn_range.get_start() == vpn)
+        {
+            area.unmap_one(page_table, vpn);
+            return 0;
+        } else {
+            println!("not found maparea {:?}", vpn);
+            return -1;
+        }
+    } else {
+        -1
+    }
 }

@@ -38,8 +38,10 @@ pub fn kernel_token() -> usize {
 
 /// address space
 pub struct MemorySet {
-    page_table: PageTable,
-    areas: Vec<MapArea>,
+    /// page table
+    pub page_table: PageTable,
+    /// logical area
+    pub areas: Vec<MapArea>,
 }
 
 impl MemorySet {
@@ -60,11 +62,11 @@ impl MemorySet {
         start_va: VirtAddr,
         end_va: VirtAddr,
         permission: MapPermission,
-    ) {
+    ) -> isize {
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
             None,
-        );
+        )
     }
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
@@ -81,12 +83,17 @@ impl MemorySet {
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
     /// space.
-    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        map_area.map(&mut self.page_table);
-        if let Some(data) = data {
-            map_area.copy_data(&mut self.page_table, data);
+    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> isize {
+        let result = map_area.map(&mut self.page_table);
+        if result == -1 {
+            return -1;
+        } else {
+            if let Some(data) = data {
+                map_area.copy_data(&mut self.page_table, data);
+            }
+            self.areas.push(map_area);
         }
-        self.areas.push(map_area);
+        return 0;
     }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
@@ -321,7 +328,7 @@ impl MemorySet {
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
-    vpn_range: VPNRange,
+    pub vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
@@ -351,7 +358,7 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> isize {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
@@ -364,7 +371,8 @@ impl MapArea {
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
+        let result = page_table.map(vpn, ppn, pte_flags);
+        result
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         if self.map_type == MapType::Framed {
@@ -372,10 +380,12 @@ impl MapArea {
         }
         page_table.unmap(vpn);
     }
-    pub fn map(&mut self, page_table: &mut PageTable) {
+    pub fn map(&mut self, page_table: &mut PageTable) -> isize {
+        let mut result: isize = 0;
         for vpn in self.vpn_range {
-            self.map_one(page_table, vpn);
+            result = self.map_one(page_table, vpn);
         }
+        return result;
     }
     pub fn unmap(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
@@ -392,9 +402,10 @@ impl MapArea {
     #[allow(unused)]
     pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
-            self.map_one(page_table, vpn)
+            self.map_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
+        
     }
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
@@ -430,6 +441,8 @@ pub enum MapType {
 bitflags! {
     /// map permission corresponding to that in pte: `R W X U`
     pub struct MapPermission: u8 {
+        /// Valaible
+        const V = 1 << 0;
         ///Readable
         const R = 1 << 1;
         ///Writable
