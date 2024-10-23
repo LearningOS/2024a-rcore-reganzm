@@ -11,19 +11,19 @@
 
 mod action;
 mod context;
-mod manager;
 mod id;
+mod manager;
 mod processor;
 mod signal;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::fs::{open_file, OpenFlags};
 use crate::{
     mm::{MapPermission, VirtAddr, VirtPageNum},
     timer::get_time_ms,
 };
-use crate::fs::{open_file, OpenFlags};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
@@ -34,8 +34,8 @@ use task::TaskInfo;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use action::{SignalAction, SignalActions};
-pub use manager::{add_task, pid2task};
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
+pub use manager::{add_task, pid2task};
 pub use processor::{
     current_task, current_trap_cx, current_user_token, run_tasks, schedule, take_current_task,
 };

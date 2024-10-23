@@ -5,7 +5,9 @@ use crate::{
     fs::{open_file, OpenFlags},
     mm::{translated_ref, translated_refmut, translated_str, PageTable, VirtAddr},
     task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next, get_current_task_info, get_current_task_status, insert_framed_area, pid2task, suspend_current_and_run_next, un_map, SignalAction, SignalFlags, TaskStatus, MAX_SIG
+        add_task, current_task, current_user_token, exit_current_and_run_next,
+        get_current_task_info, get_current_task_status, insert_framed_area, pid2task,
+        suspend_current_and_run_next, un_map, SignalAction, SignalFlags, TaskStatus, MAX_SIG,
     },
     timer::get_time_us,
 };
@@ -30,7 +32,7 @@ pub struct TaskInfo {
 }
 
 pub fn sys_exit(exit_code: i32) -> ! {
-    trace!("kernel:pid[{}] sys_exit",current_task().unwrap().pid.0);
+    trace!("kernel:pid[{}] sys_exit", current_task().unwrap().pid.0);
     exit_current_and_run_next(exit_code);
     panic!("Unreachable in sys_exit!");
 }
@@ -42,12 +44,12 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_getpid() -> isize {
-	trace!("kernel: sys_getpid pid:{}", current_task().unwrap().pid.0);
+    trace!("kernel: sys_getpid pid:{}", current_task().unwrap().pid.0);
     current_task().unwrap().pid.0 as isize
 }
 
 pub fn sys_fork() -> isize {
-	trace!("kernel:pid[{}] sys_fork", current_task().unwrap().pid.0);
+    trace!("kernel:pid[{}] sys_fork", current_task().unwrap().pid.0);
     let current_task = current_task().unwrap();
     let new_task = current_task.fork();
     let new_pid = new_task.pid.0;
@@ -131,7 +133,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 }
 
 pub fn sys_kill(pid: usize, signum: i32) -> isize {
-	trace!("kernel:pid[{}] sys_kill", current_task().unwrap().pid.0);
+    trace!("kernel:pid[{}] sys_kill", current_task().unwrap().pid.0);
     if let Some(task) = pid2task(pid) {
         if let Some(flag) = SignalFlags::from_bits(1 << signum) {
             // insert the signal if legal
@@ -261,18 +263,32 @@ pub fn sys_sbrk(size: i32) -> isize {
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
-    trace!("kernel:pid[{}] sys_spawn NOT IMPLEMENTED", current_task().unwrap().pid.0);
+    trace!(
+        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+        current_task().unwrap().pid.0
+    );
     -1
 }
 
 // YOUR JOB: Set task priority.
-pub fn sys_set_priority(_prio: isize) -> isize {
-    trace!("kernel:pid[{}] sys_set_priority NOT IMPLEMENTED", current_task().unwrap().pid.0);
-    -1
+pub fn sys_set_priority(prio: isize) -> isize {
+    let mut result = -1isize;
+    if prio >= 2 {
+        let current_task = current_task();
+        if let Some(tcb) = current_task {
+            let mut inner = tcb.inner_exclusive_access();
+            inner.priority = prio;
+            result = prio;
+        }
+    }
+    result
 }
 
 pub fn sys_sigprocmask(mask: u32) -> isize {
-    trace!("kernel:pid[{}] sys_sigprocmask", current_task().unwrap().pid.0);
+    trace!(
+        "kernel:pid[{}] sys_sigprocmask",
+        current_task().unwrap().pid.0
+    );
     if let Some(task) = current_task() {
         let mut inner = task.inner_exclusive_access();
         let old_mask = inner.signal_mask;
@@ -288,7 +304,10 @@ pub fn sys_sigprocmask(mask: u32) -> isize {
 }
 
 pub fn sys_sigreturn() -> isize {
-    trace!("kernel:pid[{}] sys_sigreturn", current_task().unwrap().pid.0);
+    trace!(
+        "kernel:pid[{}] sys_sigreturn",
+        current_task().unwrap().pid.0
+    );
     if let Some(task) = current_task() {
         let mut inner = task.inner_exclusive_access();
         inner.handling_sig = -1;
@@ -321,7 +340,10 @@ pub fn sys_sigaction(
     action: *const SignalAction,
     old_action: *mut SignalAction,
 ) -> isize {
-    trace!("kernel:pid[{}] sys_sigaction", current_task().unwrap().pid.0);
+    trace!(
+        "kernel:pid[{}] sys_sigaction",
+        current_task().unwrap().pid.0
+    );
     let token = current_user_token();
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access();

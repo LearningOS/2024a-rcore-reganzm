@@ -1,6 +1,9 @@
 //! Types related to task management & Functions for completely changing TCB
 
-use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle, SignalActions, SignalFlags, TaskContext};
+use super::{
+    kstack_alloc, pid_alloc, KernelStack, PidHandle, SignalActions, SignalFlags, TaskContext,
+};
+use crate::config::MAX_SYSCALL_NUM;
 use crate::{
     config::TRAP_CONTEXT_BASE,
     fs::{File, Stdin, Stdout},
@@ -14,7 +17,6 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use crate::config::MAX_SYSCALL_NUM;
 use core::cell::RefMut;
 
 /// Task information
@@ -108,6 +110,9 @@ pub struct TaskControlBlockInner {
 
     /// pub  end time
     pub end_time: usize,
+
+    /// task priority >= 2
+    pub priority: isize,
 }
 
 impl TaskControlBlockInner {
@@ -186,6 +191,7 @@ impl TaskControlBlock {
                         syscall_times: [0; MAX_SYSCALL_NUM],
                         time: 0,
                     },
+                    priority: 16,
                 })
             },
         };
@@ -308,6 +314,7 @@ impl TaskControlBlock {
                         syscall_times: [0; MAX_SYSCALL_NUM],
                         time: 0,
                     },
+                    priority: 16,
                 })
             },
         });
