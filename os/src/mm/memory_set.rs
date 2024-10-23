@@ -387,7 +387,6 @@ impl MapArea {
             self.map_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
-        
     }
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
