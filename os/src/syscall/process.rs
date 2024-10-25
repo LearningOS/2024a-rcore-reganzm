@@ -1,22 +1,14 @@
 //! Process management syscalls
 
 use crate::{
-    config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS},
-    mm::{translated_ref, translated_refmut, translated_str, PageTable, VirtAddr},
-    task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next,
-        get_current_task_info, get_current_task_status, insert_framed_area, pid2task,
-        suspend_current_and_run_next, un_map, SignalAction, SignalFlags, TaskStatus, MAX_SIG,
-    },
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS}, fs::{open_file, OpenFlags}, mm::{translated_ref, translated_refmut, translated_str, PageTable, VirtAddr}, task::{
+        add_task, current_task, current_user_token, exit_current_and_run_next, get_current_task_info, get_current_task_status, insert_framed_area, pid2task, suspend_current_and_run_next, un_map, SignalAction, SignalFlags, TaskControlBlock, TaskStatus, MAX_SIG
+    }, timer::get_time_us
 };
 
 use alloc::sync::Arc;
 
-use crate::{
-    fs::{open_file, File, OSInode, OpenFlags},
-    task::TaskControlBlock,
-    timer::get_time_us,
-};
+
 use alloc::{string::String, vec::Vec};
 
 #[repr(C)]
@@ -268,30 +260,37 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-
 pub fn sys_spawn(path: *const u8) -> isize {
     let mut new_task_id: isize = -1;
     let token = current_user_token();
     let paths = translated_str(token, path);
     let current_task = current_task();
-    println!("path:{}", paths);
     if let Some(ctask) = current_task {
-        if let Some(app_inode) = open_file(paths.as_str(), OpenFlags::RDWR) {
-            if let Some(node) = app_inode.as_any().downcast_ref::<OSInode>() {
-                println!("-->offset:{} ", node.inner.exclusive_access().offset);
-                let elf_data = node.read_all();
-                println!("elf data size:{}", elf_data.len());
-                if !elf_data.is_empty() {
-                    let mut cinner = ctask.inner_exclusive_access();
-                    let new_task = Arc::new(TaskControlBlock::new(&elf_data));
-                    new_task_id = new_task.getpid() as isize;
-                    cinner.children.push(new_task.clone());
-                    new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&ctask));
-                    add_task(new_task);
-                    println!("add task......");
-                } else {
-                    println!("elf data is empty");
-                }
+        let mut cinner = ctask.inner_exclusive_access();
+        println!(
+            "path:{} current task_id:{} parent id:{}",
+            paths,
+            ctask.getpid(),
+            (&cinner.parent.as_ref())
+                .unwrap()
+                .upgrade()
+                .unwrap()
+                .getpid()
+        );
+        if let Some(app_inode) = open_file(paths.as_str(), OpenFlags::RDONLY) {
+            //if let Some(node) = app_inode.as_any().downcast_ref::<OSInode>() {
+            println!("offset:{} ", app_inode.inner.exclusive_access().offset);
+            let elf_data = app_inode.read_all();
+            println!("elf data size:{}", elf_data.len());
+            if !elf_data.is_empty() {
+                let new_task = Arc::new(TaskControlBlock::new(elf_data.as_slice()));
+                new_task_id = new_task.getpid() as isize;
+                cinner.children.push(new_task.clone());
+                new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&ctask));
+                add_task(new_task);
+                println!("add task......");
+            } else {
+                println!("elf data is empty");
             }
         }
     }

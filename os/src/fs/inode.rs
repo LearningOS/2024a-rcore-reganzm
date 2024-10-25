@@ -119,6 +119,7 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
         }
     } else {
         ROOT_INODE.find(name).map(|inode| {
+            println!("ROOT INODE find:{}",name);
             if flags.contains(OpenFlags::TRUNC) {
                 inode.clear();
             }
