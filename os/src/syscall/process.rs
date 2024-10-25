@@ -2,17 +2,22 @@
 
 use crate::{
     config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS},
-    fs::{open_file, OpenFlags},
     mm::{translated_ref, translated_refmut, translated_str, PageTable, VirtAddr},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         get_current_task_info, get_current_task_status, insert_framed_area, pid2task,
-        suspend_current_and_run_next, un_map, SignalAction, SignalFlags, TaskStatus, MAX_SIG
+        suspend_current_and_run_next, un_map, SignalAction, SignalFlags, TaskStatus, MAX_SIG,
     },
+};
 
+use alloc::sync::Arc;
+
+use crate::{
+    fs::{open_file, File, OSInode, OpenFlags},
+    task::TaskControlBlock,
     timer::get_time_us,
 };
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{string::String, vec::Vec};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -263,13 +268,35 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(_path: *const u8) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    
-    -1
+
+pub fn sys_spawn(path: *const u8) -> isize {
+    let mut new_task_id: isize = -1;
+    let token = current_user_token();
+    let paths = translated_str(token, path);
+    let current_task = current_task();
+    println!("path:{}", paths);
+    if let Some(ctask) = current_task {
+        if let Some(app_inode) = open_file(paths.as_str(), OpenFlags::RDWR) {
+            if let Some(node) = app_inode.as_any().downcast_ref::<OSInode>() {
+                println!("-->offset:{} ", node.inner.exclusive_access().offset);
+                let elf_data = node.read_all();
+                println!("elf data size:{}", elf_data.len());
+                if !elf_data.is_empty() {
+                    let mut cinner = ctask.inner_exclusive_access();
+                    let new_task = Arc::new(TaskControlBlock::new(&elf_data));
+                    new_task_id = new_task.getpid() as isize;
+                    cinner.children.push(new_task.clone());
+                    new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&ctask));
+                    add_task(new_task);
+                    println!("add task......");
+                } else {
+                    println!("elf data is empty");
+                }
+            }
+        }
+    }
+
+    new_task_id
 }
 
 // YOUR JOB: Set task priority.

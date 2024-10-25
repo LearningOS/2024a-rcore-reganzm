@@ -173,4 +173,8 @@ impl File for Pipe {
             }
         }
     }
+    
+    fn as_any(&self) -> &dyn core::any::Any {
+        todo!()
+    }
 }
