@@ -4,6 +4,8 @@
 //!
 //! `UPSafeCell<OSInodeInner>` -> `OSInode`: for static `ROOT_INODE`,we
 //! need to wrap `OSInodeInner` into `UPSafeCell`
+use core::any::Any;
+
 use super::File;
 use crate::drivers::BLOCK_DEVICE;
 use crate::mm::UserBuffer;
@@ -17,15 +19,16 @@ use lazy_static::*;
 /// inode in memory
 /// A wrapper around a filesystem inode
 /// to implement File trait atop
+
 pub struct OSInode {
     readable: bool,
     writable: bool,
-    inner: UPSafeCell<OSInodeInner>,
+    pub inner: UPSafeCell<OSInodeInner>,
 }
 /// The OS inode inner in 'UPSafeCell'
 pub struct OSInodeInner {
-    offset: usize,
-    inode: Arc<Inode>,
+    pub offset: usize,
+    pub inode: Arc<Inode>,
 }
 
 impl OSInode {
@@ -154,5 +157,9 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
