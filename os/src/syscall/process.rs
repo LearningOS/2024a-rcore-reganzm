@@ -239,7 +239,7 @@ pub fn sys_spawn(path: *const u8) -> isize {
         new_task_id = new_task.getpid() as isize;
         let task = current_task().unwrap();
         task.inner_exclusive_access().children.push(new_task.clone());
-        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&new_task));
+        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&task));
         add_task(new_task);
     };
     new_task_id
