@@ -306,13 +306,13 @@ pub fn sys_spawn(path: *const u8) -> isize{
     // fork + exec
     if let Some(current_task) = current_task(){
         let new_task = current_task.fork();
-        add_task(new_task.clone());
         child_pid = new_task.getpid() as isize;
         let token = current_user_token();
         let path = translated_str(token, path);
         if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
             let all_data = app_inode.read_all();
             new_task.exec(all_data.as_slice());
+            add_task(new_task.clone());
         }
     }
     child_pid
