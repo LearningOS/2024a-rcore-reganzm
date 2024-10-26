@@ -10,7 +10,7 @@ use crate::{
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         get_current_task_info, get_current_task_status, insert_framed_area,
-        suspend_current_and_run_next, un_map, TaskControlBlock, TaskStatus,
+        suspend_current_and_run_next, un_map, TaskStatus
     },
     timer::get_time_us,
 };
@@ -232,6 +232,7 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
+// todo old version
 //pub fn sys_spawn(_path: *const u8) -> isize {
 // let mut new_task_id: isize = -1;
 // let token = current_user_token();
@@ -253,55 +254,70 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-/**
-* let token = current_user_token();
-   let path = translated_str(token, path);
-   if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
-       let all_data = app_inode.read_all();
-       let task = current_task().unwrap();
-       task.exec(all_data.as_slice());
-       0
-   } else {
-       -1
-   }
-*/
-pub fn sys_spawn(path: *const u8) -> isize {
-    let mut new_task_id: isize = -1;
-    let token = current_user_token();
-    let paths = translated_str(token, path);
-    let current_task = current_task();
-    if let Some(ctask) = current_task {
-        let mut cinner = ctask.inner_exclusive_access();
-        println!(
-            "path:{} current task_id:{} parent id:{}",
-            paths,
-            ctask.getpid(),
-            (&cinner.parent.as_ref())
-                .unwrap()
-                .upgrade()
-                .unwrap()
-                .getpid()
-        );
-        if let Some(app_inode) = open_file(paths.as_str(), OpenFlags::RDONLY) {
-            //if let Some(node) = app_inode.as_any().downcast_ref::<OSInode>() {
-            println!("offset:{} ", app_inode.inner.exclusive_access().offset);
-            let elf_data = app_inode.read_all();
-            println!("elf data size:{}", elf_data.len());
-            if !elf_data.is_empty() {
-                let new_task = Arc::new(TaskControlBlock::new(elf_data.as_slice()));
-                new_task_id = new_task.getpid() as isize;
-                cinner.children.push(new_task.clone());
-                new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&ctask));
-                add_task(new_task);
-                println!("add task......");
-            } else {
-                println!("elf data is empty");
-            }
+/// have problem! 
+/// path:ch3b_yield1 current task_id:2 parent id:1
+/// ROOT INODE find:ch3b_yield1
+/// elf data size:0
+/// elf data is empty
+// pub fn sys_spawn(path: *const u8) -> isize {
+//     let mut new_task_id: isize = -1;
+//     let token = current_user_token();
+//     let paths = translated_str(token, path);
+//     let current_task = current_task();
+//     if let Some(ctask) = current_task {
+//         let mut cinner = ctask.inner_exclusive_access();
+//         println!(
+//             "path:{} current task_id:{} parent id:{}",
+//             paths,
+//             ctask.getpid(),
+//             (&cinner.parent.as_ref())
+//                 .unwrap()
+//                 .upgrade()
+//                 .unwrap()
+//                 .getpid()
+//         );
+//         if let Some(app_inode) = open_file(paths.as_str(), OpenFlags::RDONLY) {
+//             //if let Some(node) = app_inode.as_any().downcast_ref::<OSInode>() {
+//             // save opened fd but why?
+//             let fd = cinner.alloc_fd();
+//             cinner.fd_table[fd] = Some(app_inode.clone());
+//             let elf_data = app_inode.read_all();
+//             println!("elf data size:{}", elf_data.len());
+//             if !elf_data.is_empty() {
+//                 let new_task = Arc::new(TaskControlBlock::new(elf_data.as_slice()));
+//                 new_task_id = new_task.getpid() as isize;
+//                 cinner.children.push(new_task.clone());
+//                 new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&ctask));
+//                 add_task(new_task);
+//                 println!("add task......");
+//             } else {
+//                 println!("elf data is empty");
+//             }
+//         }
+//     }
+
+//     new_task_id
+// }
+
+/// YOUR JOB: Implement spawn.
+
+pub fn sys_spawn(path: *const u8) -> isize{
+    let mut child_pid:isize = -1;
+    // fork + exec
+    if let Some(current_task) = current_task(){
+        let new_task = current_task.fork();
+        add_task(new_task.clone());
+        child_pid = new_task.getpid() as isize;
+        let token = current_user_token();
+        let path = translated_str(token, path);
+        if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+            let all_data = app_inode.read_all();
+            new_task.exec(all_data.as_slice());
         }
     }
-
-    new_task_id
+    child_pid
 }
+
 
 // YOUR JOB: Set task priority.
 pub fn sys_set_priority(prio: isize) -> isize {
