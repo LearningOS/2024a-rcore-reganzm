@@ -12,6 +12,8 @@ pub struct Inode {
     block_offset: usize,
     fs: Arc<Mutex<EasyFileSystem>>,
     block_device: Arc<dyn BlockDevice>,
+    /// inode_id from inode bitmap
+    pub inode_id: u32,
 }
 
 impl Inode {
@@ -21,14 +23,46 @@ impl Inode {
         block_offset: usize,
         fs: Arc<Mutex<EasyFileSystem>>,
         block_device: Arc<dyn BlockDevice>,
+        inode_id: u32,
     ) -> Self {
         Self {
             block_id: block_id as usize,
             block_offset,
             fs,
             block_device,
+            inode_id,
         }
     }
+
+    /// get inode mode
+    /// -1 File
+    /// 1 Dir
+    pub fn get_disk_inode_mode(&self) -> isize {
+        let fs = self.fs.lock();
+        let block_device = Arc::clone(&self.block_device);
+        let (block_id, offset) = fs.get_disk_inode_pos(self.inode_id);
+        get_block_cache(block_id as usize, Arc::clone(&block_device))
+            .lock()
+            .read(offset, |disk_inode: &DiskInode| match disk_inode.type_ {
+                DiskInodeType::File => -1,
+                DiskInodeType::Directory => 1,
+            })
+    }
+
+    // hard link
+    // 0 ok
+    // -1 error
+    // pub fn hard_link(&self, old_name:&str, new_name:&str)->isize{
+    //     let mut result = 0;
+
+    //     // find node_id 
+
+
+
+
+    //     result
+    // }
+
     /// Call a function over a disk inode to read it
     fn read_disk_inode<V>(&self, f: impl FnOnce(&DiskInode) -> V) -> V {
         get_block_cache(self.block_id, Arc::clone(&self.block_device))
@@ -69,6 +103,7 @@ impl Inode {
                     block_offset,
                     self.fs.clone(),
                     self.block_device.clone(),
+                    inode_id,
                 ))
             })
         })
@@ -135,6 +170,7 @@ impl Inode {
             block_offset,
             self.fs.clone(),
             self.block_device.clone(),
+            new_inode_id,
         )))
         // release efs lock automatically by compiler
     }

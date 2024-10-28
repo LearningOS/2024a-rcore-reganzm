@@ -10,7 +10,7 @@ use crate::{
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         get_current_task_info, get_current_task_status, insert_framed_area,
-        suspend_current_and_run_next, un_map, TaskStatus
+        suspend_current_and_run_next, un_map, TaskStatus,
     },
     timer::get_time_us,
 };
@@ -254,7 +254,7 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-/// have problem! 
+/// have problem!
 /// path:ch3b_yield1 current task_id:2 parent id:1
 /// ROOT INODE find:ch3b_yield1
 /// elf data size:0
@@ -301,10 +301,10 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 
-pub fn sys_spawn(path: *const u8) -> isize{
-    let mut child_pid:isize = -1;
+pub fn sys_spawn(path: *const u8) -> isize {
+    let mut child_pid: isize = -1;
     // fork + exec
-    if let Some(current_task) = current_task(){
+    if let Some(current_task) = current_task() {
         let new_task = current_task.fork();
         child_pid = new_task.getpid() as isize;
         let token = current_user_token();
@@ -317,7 +317,6 @@ pub fn sys_spawn(path: *const u8) -> isize{
     }
     child_pid
 }
-
 
 // YOUR JOB: Set task priority.
 pub fn sys_set_priority(prio: isize) -> isize {
