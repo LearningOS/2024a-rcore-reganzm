@@ -58,7 +58,8 @@ impl SuperBlock {
     }
 }
 
-#[derive(PartialEq)]
+/// Type of a disk inode
+#[derive(PartialEq, Clone)]
 pub enum DiskInodeType {
     File,
     Directory,
@@ -73,7 +74,7 @@ pub struct DiskInode {
     pub direct: [u32; INODE_DIRECT_COUNT],
     pub indirect1: u32,
     pub indirect2: u32,
-    type_: DiskInodeType,
+    pub type_: DiskInodeType,
 }
 
 impl DiskInode {
