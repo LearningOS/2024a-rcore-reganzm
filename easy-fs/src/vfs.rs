@@ -34,7 +34,6 @@ impl Inode {
         }
     }
 
-
     /// get inode mode
     /// -1 File
     /// 1 Dir

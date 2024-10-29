@@ -275,7 +275,7 @@ pub fn sys_spawn(path: *const u8) -> isize {
         let path = translated_str(token, path);
         if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
             let all_data = app_inode.read_all();
-            new_task.exec(all_data.as_slice());
+            new_task.exec(all_data.as_slice(), Vec::new());
             add_task(new_task.clone());
         }
     }
