@@ -78,16 +78,11 @@ pub fn sys_close(fd: usize) -> isize {
 
 /// YOUR JOB: Implement fstat.
 pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
-    println!(
-        "kernel:pid[{}] sys_fstat NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
     let mut result: isize = -1;
     unsafe {
         let stat = get_pa_from_va(st as usize) as *mut Stat;
         if let Some(task) = current_task() {
             let fd_table = &task.inner_exclusive_access().fd_table;
-
             if let Some(fd) = fd_table[fd].clone() {
                 if let Some(osinode) = fd.as_any().downcast_ref::<OSInode>() {
                     let osinner = osinode.inner.exclusive_access();
@@ -104,6 +99,11 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
                         _ => StatMode::NULL,
                     };
                     (*stat).mode = file_mode;
+                    // nlink
+                    let root_inode_id = osinner.inode.get_root_inode();
+                    let nlinks = root_inode_id.hard_link_count(inode_id);
+                    println!("nlinks : {} inode_id :{} ", nlinks, inode_id);
+                    (*stat).nlink = nlinks as u32;
                 }
             }
             // dev
@@ -119,12 +119,16 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
 }
 
 /// YOUR JOB: Implement linkat.
-pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
-    println!(
-        "kernel:pid[{}] sys_linkat NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
+    let mut result = -1;
+    let token = current_user_token();
+    let s_old_name = translated_str(token, old_name);
+    let s_new_name = translated_str(token, new_name);
+    if let Some(osinode) = open_file(&s_old_name.as_str(), OpenFlags::RDWR) {
+        let root_inode = osinode.inner.exclusive_access().inode.get_root_inode();
+        result = root_inode.hard_link(s_old_name.as_str(), s_new_name.as_str());
+    }
+    result
 }
 
 /// YOUR JOB: Implement unlinkat.

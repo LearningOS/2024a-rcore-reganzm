@@ -123,9 +123,10 @@ impl EasyFileSystem {
     }
 
     /// Get data block by id
-    pub fn get_data_block_id(&self, data_block_id: u32) -> u32 {
-        self.data_area_start_block + data_block_id
-    }
+    /// this func is error
+    // pub fn get_data_block_id(&self, data_block_id: u32) -> u32 {
+    //     self.data_area_start_block + data_block_id
+    // }
     /// Allocate a new inode
     pub fn alloc_inode(&mut self) -> u32 {
         self.inode_bitmap.alloc(&self.block_device).unwrap() as u32
