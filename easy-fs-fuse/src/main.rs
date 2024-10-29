@@ -101,8 +101,12 @@ fn efs_test() -> std::io::Result<()> {
     EasyFileSystem::create(block_file.clone(), 4096, 1);
     let efs = EasyFileSystem::open(block_file.clone());
     let root_inode = EasyFileSystem::root_inode(&efs);
-    root_inode.create("filea");
+    let inode = root_inode.create("filea");
+    root_inode.hard_link("filea", "fileaa");
+    root_inode.hard_link("filea", "fileaa123");
+    
     root_inode.create("fileb");
+    println!("hard link count:{}",root_inode.hard_link_count(inode.unwrap().inode_id));
     for name in root_inode.ls() {
         println!("{}", name);
     }
