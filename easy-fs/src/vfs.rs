@@ -54,12 +54,10 @@ impl Inode {
     /// 0 ok
     /// -1 error
     pub fn hard_link(&self, old_name: &str, new_name: &str) -> isize {
-        //println!("old_name:{} new_name:{}",old_name,new_name);
         let mut result = -1;
         //  step1 get old_name's inode
         //  step2 create dir entry with new_name and  old_name's inode
         if let Some(inode) = self.find(old_name) {
-            //println!("9999999");
             let inode_id = inode.inode_id;
             self.modify_disk_inode(|root_inode| {
                 // append file in the dirent
@@ -70,7 +68,6 @@ impl Inode {
                 self.increase_size(new_size as u32, root_inode, &mut fs);
                 // write dirent
                 let dirent = DirEntry::new(new_name, inode_id);
-                //println!("dirent:{:?}",dirent.inode_id());
                 root_inode.write_at(
                     file_count * DIRENT_SZ,
                     dirent.as_bytes(),
@@ -85,18 +82,37 @@ impl Inode {
     /// hard unlink
     /// 0 ok
     /// -1 error
-    pub fn hard_un_link(&self, _path: &str) -> isize {
+    pub fn hard_un_link(&self, path: &str) -> isize {
         // step1 get path's inode
         // step2 set clear DirEntry
-        let mut result = 0;
+        let mut result = -1;
+        if let Some(inode) = self.find(path) {
+            let inode_id = inode.inode_id;
+            self.modify_disk_inode(|root_inode| {
+                // append file in the dirent
+                let file_count = (root_inode.size as usize) / DIRENT_SZ;
+                let mut dirent = DirEntry::empty();
+                for i in 0..file_count {
+                    root_inode.read_at(i * DIRENT_SZ, dirent.as_bytes_mut(), &self.block_device);
+                    if dirent.name() == path {
+                        let dirent = DirEntry::new("", 0);
+                        root_inode.write_at(i * DIRENT_SZ, dirent.as_bytes(), &self.block_device);
+                        result = 0;
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+            });
+        }
         result
     }
     /// get root inode
-    pub fn get_root_inode(&self)->Inode{
+    pub fn get_root_inode(&self) -> Inode {
         EasyFileSystem::root_inode(&self.fs)
     }
     /// get hard link count
-    pub fn hard_link_count(&self,inode_id:u32)->usize{
+    pub fn hard_link_count(&self, inode_id: u32) -> usize {
         let mut results = 0;
         let _fs = self.fs.lock();
         self.read_disk_inode(|disk_inode| {
@@ -107,14 +123,13 @@ impl Inode {
                     disk_inode.read_at(i * DIRENT_SZ, dirent.as_bytes_mut(), &self.block_device,),
                     DIRENT_SZ,
                 );
-                if dirent.inode_id() == inode_id{
+                if dirent.inode_id() == inode_id {
                     results += 1;
                 }
             }
         });
 
         results
-
     }
 
     fn read_disk_inode<V>(&self, f: impl FnOnce(&DiskInode) -> V) -> V {

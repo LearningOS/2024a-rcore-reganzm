@@ -156,7 +156,7 @@ pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
     let token = current_user_token();
     let s_old_name = translated_str(token, old_name);
     let s_new_name = translated_str(token, new_name);
-    if let Some(osinode) = open_file(&s_old_name.as_str(), OpenFlags::RDWR) {
+    if let Some(osinode) = open_file(&s_old_name, OpenFlags::RDWR) {
         let root_inode = osinode.inner.exclusive_access().inode.get_root_inode();
         result = root_inode.hard_link(s_old_name.as_str(), s_new_name.as_str());
     }
@@ -164,10 +164,13 @@ pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
 }
 
 /// YOUR JOB: Implement unlinkat.
-pub fn sys_unlinkat(_name: *const u8) -> isize {
-    println!(
-        "kernel:pid[{}] sys_unlinkat NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_unlinkat(name: *const u8) -> isize {
+    let mut result = -1;
+    let token = current_user_token();
+    let s_name = translated_str(token, name);
+    if let Some(osinode) = open_file(&s_name, OpenFlags::RDWR) {
+        let root_inode = osinode.inner.exclusive_access().inode.get_root_inode();
+        result = root_inode.hard_un_link(&s_name);
+    }
+    result
 }
