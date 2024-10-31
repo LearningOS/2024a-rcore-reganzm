@@ -4,7 +4,6 @@ use crate::fs::{open_file, OSInode, OpenFlags, Stat, StatMode};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::syscall::get_pa_from_va;
 use crate::task::{current_task, current_user_token};
-use alloc::sync::Arc;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!("kernel:pid[{}] sys_write", current_task().unwrap().pid.0);
@@ -104,7 +103,8 @@ pub fn sys_dup(fd: usize) -> isize {
         return -1;
     }
     let new_fd = inner.alloc_fd();
-    inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+    //inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+    inner.fd_table[new_fd] = Some(inner.fd_table[fd].as_ref().unwrap().clone());
     new_fd as isize
 }
 
