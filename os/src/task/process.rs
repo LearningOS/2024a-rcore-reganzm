@@ -49,6 +49,52 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    /// enable deadlock detected
+    pub deadlock_detection_enabled: bool,
+    /// the mutex resource recoreds
+    pub mutex_deadlock_detector: MutexDeadlockDetector,
+    /// the sem resource records
+    pub sem_deadlock_detector: SemDeadlockDetector,
+}
+
+const MAX_THREADS: usize = 128;
+const MAX_RESOURCES: usize = 32;
+
+
+pub struct MutexDeadlockDetector {
+    pub available: [i32; MAX_RESOURCES],
+    pub allocation: [[i32; MAX_RESOURCES]; MAX_THREADS],
+    pub need: [[i32; MAX_RESOURCES]; MAX_THREADS],
+    pub finish: [bool; MAX_THREADS],
+}
+
+impl MutexDeadlockDetector{
+    fn new() -> Self {
+        MutexDeadlockDetector {
+            available:[1; MAX_RESOURCES],
+            allocation: [[0; MAX_RESOURCES]; MAX_THREADS],
+            need: [[0; MAX_RESOURCES]; MAX_THREADS],
+            finish: [false; MAX_THREADS],
+        }
+    }
+}
+
+pub struct SemDeadlockDetector {
+    pub available: [i32; MAX_RESOURCES],
+    pub allocation: [[i32; MAX_RESOURCES]; MAX_THREADS],
+    pub need: [[i32; MAX_RESOURCES]; MAX_THREADS],
+    pub finish: [bool; MAX_THREADS],
+}
+
+impl SemDeadlockDetector{
+    fn new() -> Self {
+        SemDeadlockDetector {
+            available:[0; MAX_RESOURCES],
+            allocation: [[0; MAX_RESOURCES]; MAX_THREADS],
+            need: [[0; MAX_RESOURCES]; MAX_THREADS],
+            finish: [false; MAX_THREADS],
+        }
+    }
 }
 
 impl ProcessControlBlockInner {
@@ -119,6 +165,9 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    deadlock_detection_enabled: false,
+                    mutex_deadlock_detector:MutexDeadlockDetector::new(),
+                    sem_deadlock_detector:SemDeadlockDetector::new()
                 })
             },
         });
@@ -245,6 +294,9 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    deadlock_detection_enabled: false,
+                    mutex_deadlock_detector:MutexDeadlockDetector::new(),
+                    sem_deadlock_detector:SemDeadlockDetector::new()
                 })
             },
         });
