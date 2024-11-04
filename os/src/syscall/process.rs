@@ -1,11 +1,11 @@
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS},
     fs::{open_file, OpenFlags},
-    mm::{translated_ref, translated_refmut, translated_str},
+    mm::{translated_ref, translated_refmut, translated_str, PageTable, VirtAddr},
     task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
-    },
+    }, timer::get_time_us,
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
 
@@ -162,12 +162,27 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
-    -1
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
+    let ts_pa = get_pa_from_va(ts as usize) as *mut TimeVal;
+    let us = get_time_us();
+    unsafe {
+        *ts_pa = TimeVal {
+            sec: us / 1000000,
+            usec: us % 1000000,
+        };
+    }
+    0
+}
+
+/// use a virtual addr to get it's mapped physic addr
+pub fn get_pa_from_va(va: usize) -> usize {
+    let current_user_token = current_user_token();
+    let current_page_table = PageTable::from_token(current_user_token);
+    let vpn = VirtAddr::from(va).floor();
+    let vpn_offset = VirtAddr::from(va).page_offset();
+    let ppn = current_page_table.translate(vpn).unwrap().ppn().0;
+    let pa = ppn << PAGE_SIZE_BITS | vpn_offset;
+    pa
 }
 
 /// task_info syscall
