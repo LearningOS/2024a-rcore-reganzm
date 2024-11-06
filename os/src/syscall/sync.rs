@@ -36,7 +36,6 @@ pub fn sys_mutex_create(blocking: bool) -> isize {
     process_inner
         .deadlock_detector
         .add_resource(Resource::Mutex(mutex_id as usize), 1);
-    process_inner.deadlock_detector.display(get_tid());
 
     mutex_id
 }
@@ -53,7 +52,6 @@ fn get_tid() -> usize {
 
 /// mutex lock syscall
 pub fn sys_mutex_lock(mutex_id: usize) -> isize {
-    let mut result: isize = -1;
     let process = current_process();
     let mut process_inner = process.inner_exclusive_access();
     let detected_deadlock_flag = process_inner.deadlock_detection_enabled;
@@ -65,26 +63,27 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
             process_inner
                 .deadlock_detector
                 .try_request(task_id, 1, Resource::Mutex(mutex_id));
-        process_inner.deadlock_detector.display(task_id);
+            drop(process_inner);
+            drop(process);
         println!("try_result------>{}", try_result);
         if try_result {
-            result = 0;
-            process_inner
+            mutex.lock();
+            
+            {
+                current_process().inner_exclusive_access()
                 .deadlock_detector
                 .request(task_id, 1, Resource::Mutex(mutex_id));
-            process_inner.deadlock_detector.display(task_id);
-            mutex.lock();
+            }
+            return  0;
         } else {
-            result = -0xDEAD;
+            return  -0xDEAD;
         }
     } else {
+        drop(process_inner);
+        drop(process);
         mutex.lock();
     }
-    process_inner.deadlock_detector.display(task_id);
-    drop(process_inner);
-    drop(process);
-
-    result
+    0
 }
 /// mutex unlock syscall
 pub fn sys_mutex_unlock(mutex_id: usize) -> isize {
@@ -97,7 +96,6 @@ pub fn sys_mutex_unlock(mutex_id: usize) -> isize {
             .deadlock_detector
             .release_resource(task_id, 1, Resource::Mutex(mutex_id));
     }
-    process_inner.deadlock_detector.display(task_id);
     mutex.unlock();
     0
 }
@@ -118,12 +116,13 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
         process_inner
             .semaphore_list
             .push(Some(Arc::new(Semaphore::new(res_count))));
-        process_inner.semaphore_list.len() - 1
+        let id = process_inner.semaphore_list.len() - 1;
+        process_inner
+            .deadlock_detector
+            .add_resource(Resource::Semaphore(id), res_count);
+        id
     };
-    process_inner
-        .deadlock_detector
-        .add_resource(Resource::Semaphore(id), res_count);
-    process_inner.deadlock_detector.display(get_tid());
+
     id as isize
 }
 /// semaphore up syscall
@@ -137,8 +136,9 @@ pub fn sys_semaphore_up(sem_id: usize) -> isize {
             .deadlock_detector
             .release_resource(task_id, 1, Resource::Semaphore(sem_id));
     }
+    drop(process_inner);
+    drop(process);
     sem.up();
-    process_inner.deadlock_detector.display(task_id);
     0
 }
 /// semaphore down syscall
@@ -148,25 +148,28 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     let detected_dead_lock = process_inner.deadlock_detection_enabled;
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
     let task_id = get_tid();
+    
     // detected semaphore deadlock
     if detected_dead_lock {
         let try_result =
-            process_inner
-                .deadlock_detector
+            process_inner.deadlock_detector
                 .try_request(task_id, 1, Resource::Semaphore(sem_id));
+            drop(process_inner);
+            drop(process);
         println!("try_result------>{}", try_result);
-        process_inner.deadlock_detector.display(task_id);
         if try_result {
-            process_inner
-                .deadlock_detector
-                .request(task_id, 1, Resource::Semaphore(sem_id));
             sem.down();
-            process_inner.deadlock_detector.display(task_id);
+            {
+                current_process().inner_exclusive_access().deadlock_detector
+                .request(task_id, 1, Resource::Semaphore(sem_id));
+            }
             return 0;
         } else {
             return -0xDEAD;
         }
     } else {
+        drop(process_inner);
+        drop(process);
         sem.down();
         return 0;
     }
@@ -197,6 +200,7 @@ pub fn sys_condvar_signal(condvar_id: usize) -> isize {
     let process = current_process();
     let process_inner = process.inner_exclusive_access();
     let condvar = Arc::clone(process_inner.condvar_list[condvar_id].as_ref().unwrap());
+    drop(process_inner);
     condvar.signal();
     0
 }
@@ -206,6 +210,7 @@ pub fn sys_condvar_wait(condvar_id: usize, mutex_id: usize) -> isize {
     let process_inner = process.inner_exclusive_access();
     let condvar = Arc::clone(process_inner.condvar_list[condvar_id].as_ref().unwrap());
     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
+    drop(process_inner);
     condvar.wait(mutex);
     0
 }

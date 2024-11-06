@@ -93,12 +93,10 @@ impl DeadlockDetector {
             self.need[task_id][res_id] += amount;
             if self.deadlock_check() {
                 result = true;
-                println!("deadlock check is ok");
             } else {
                 self.need[task_id][res_id] -= amount;
-                self.tasks
-                    .remove(self.tasks.iter().position(|&t| t == task_id).unwrap());
-                println!("deadlock check is not ok");
+                // self.tasks
+                //     .remove(self.tasks.iter().position(|&t| t == task_id).unwrap());
             }
         } else {
             panic!("resouce not found!");
@@ -128,8 +126,6 @@ impl DeadlockDetector {
 
     /// dead lock check
     pub fn deadlock_check(&self) -> bool {
-        let mut result = false;
-
         let mut work = self.available.clone();
         let task_count = self.tasks.len();
         let mut finish = alloc::vec![false;task_count];
@@ -145,6 +141,15 @@ impl DeadlockDetector {
 
                 let mut is_safe = true;
                 for res_id in 0..self.resources.len() {
+                    println!(
+                        "task_id:{} res_id:{} need:{:?} work:{:?} avalable:{:?} allocated:{:?}",
+                        task_id,
+                        res_id,
+                        self.need[task_id][res_id],
+                        work[res_id],
+                        self.available[res_id],
+                        self.allocationed[task_id][res_id]
+                    );
                     if self.need[task_id][res_id] > work[res_id] {
                         is_safe = false;
                         break;
@@ -162,13 +167,10 @@ impl DeadlockDetector {
             }
             if !found {
                 println!("dead lock checked");
-                return result;
-            } else {
-                result = true;
+                return false;
             }
         }
-        println!("finish vec:{:?}", finish);
 
-        result
+        true
     }
 }
