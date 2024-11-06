@@ -6,7 +6,7 @@ pub enum Resource {
     Semaphore(usize),
     Condvar(usize),
 }
-const MAX_THREADS: usize = 32;
+const MAX_THREADS: usize = 512;
 const MAX_RESOURCES: usize = 32;
 
 /// dead detector

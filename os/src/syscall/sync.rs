@@ -63,20 +63,20 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
             process_inner
                 .deadlock_detector
                 .try_request(task_id, 1, Resource::Mutex(mutex_id));
-            drop(process_inner);
-            drop(process);
+        drop(process_inner);
+        drop(process);
         println!("try_result------>{}", try_result);
         if try_result {
             mutex.lock();
-            
             {
-                current_process().inner_exclusive_access()
-                .deadlock_detector
-                .request(task_id, 1, Resource::Mutex(mutex_id));
+                current_process()
+                    .inner_exclusive_access()
+                    .deadlock_detector
+                    .request(task_id, 1, Resource::Mutex(mutex_id));
             }
-            return  0;
+            return 0;
         } else {
-            return  -0xDEAD;
+            return -0xDEAD;
         }
     } else {
         drop(process_inner);
@@ -148,20 +148,23 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     let detected_dead_lock = process_inner.deadlock_detection_enabled;
     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
     let task_id = get_tid();
-    
+
     // detected semaphore deadlock
     if detected_dead_lock {
         let try_result =
-            process_inner.deadlock_detector
+            process_inner
+                .deadlock_detector
                 .try_request(task_id, 1, Resource::Semaphore(sem_id));
-            drop(process_inner);
-            drop(process);
+        drop(process_inner);
+        drop(process);
         println!("try_result------>{}", try_result);
         if try_result {
             sem.down();
             {
-                current_process().inner_exclusive_access().deadlock_detector
-                .request(task_id, 1, Resource::Semaphore(sem_id));
+                current_process()
+                    .inner_exclusive_access()
+                    .deadlock_detector
+                    .request(task_id, 1, Resource::Semaphore(sem_id));
             }
             return 0;
         } else {
